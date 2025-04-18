@@ -1,0 +1,24 @@
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+members = ["crates/routes", "crates/server", "crates/utils"]
+resolver = "2"
+
+[workspace.dependencies]
+actix-web = "4.9"
+actix-multipart = "0.7"
+aws-sdk-s3 = "1.54"
+tokio = { version = "1.40", features = ["full"] }
+futures = "0.3"
+bytes = "1.7"
+serde = { version = "1.0", features = ["derive"] }
+uuid = { version = "1.10", features = ["v4"] }
+async-stream = "0.3"
+tracing = "0.1"
+dotenv = "0.15"
+mime = "0.3"
+tokio-retry = "0.3"
+image = "0.25"
+sha2 = "0.10"
