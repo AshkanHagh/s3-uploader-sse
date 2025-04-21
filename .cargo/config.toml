@@ -1,0 +1,4 @@
+[env]
+
+RUST_LOG = "routes=debug,utils=debug,actix_server=debug,actix_web::middleware::logger=debug,aws_sdk_s3=debug,actix_web::data"
+# RUST_LOG = "routes=debug,utils=debug,actix_server=debug,actix_web::middleware::logger=debug"
