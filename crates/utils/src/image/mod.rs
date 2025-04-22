@@ -12,6 +12,7 @@ pub struct ImageConfig {
   pub secret_key: String,
   pub bucket: String,
   pub endpoint: String,
+  pub path_style: bool,
 }
 
 pub struct ImageUploader {
@@ -24,8 +25,17 @@ impl ImageUploader {
     Ok(Self { client })
   }
 
-  pub async fn create_multipart_upload(&self, key: &str) -> AppResult<String> {
-    self.client.create_multipart_upload(key).await
+  pub async fn put_object(
+    &self,
+    key: &str,
+    content_type: &str,
+    bytes: ByteStream,
+  ) -> AppResult<()> {
+    self.client.put_object(key, content_type, bytes).await
+  }
+
+  pub async fn create_multipart_upload(&self, key: &str, content_type: &str) -> AppResult<String> {
+    self.client.create_multipart_upload(key, content_type).await
   }
 
   pub async fn upload_part(

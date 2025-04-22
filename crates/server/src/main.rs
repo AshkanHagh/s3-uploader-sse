@@ -21,6 +21,7 @@ async fn main() -> AppResult<()> {
     secret_key: "password123".to_string(),
     bucket: "kalamche".to_string(),
     endpoint: "http://localhost:9000".to_string(),
+    path_style: true,
   })?;
 
   let context = Data::new(AppContext {

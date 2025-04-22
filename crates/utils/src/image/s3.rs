@@ -16,10 +16,10 @@ impl S3ImageUploader {
     let credentials = Credentials::new(&config.access_key, &config.secret_key, None, None, "s3");
     let config = aws_sdk_s3::Config::builder()
       .region(aws_sdk_s3::config::Region::new(""))
-      .endpoint_url("http://localhost:9000")
       .credentials_provider(credentials)
+      .endpoint_url(&config.endpoint)
+      .force_path_style(config.path_style)
       .behavior_version_latest()
-      .force_path_style(true)
       .build();
 
     Ok(Self {
@@ -28,12 +28,31 @@ impl S3ImageUploader {
     })
   }
 
-  pub async fn create_multipart_upload(&self, key: &str) -> AppResult<String> {
+  pub async fn put_object(
+    &self,
+    key: &str,
+    content_type: &str,
+    bytes: ByteStream,
+  ) -> AppResult<()> {
+    self
+      .bucket
+      .put_object()
+      .bucket(&self.bucket_name)
+      .key(key)
+      .content_type(content_type)
+      .body(bytes)
+      .send()
+      .await?;
+
+    Ok(())
+  }
+
+  pub async fn create_multipart_upload(&self, key: &str, content_type: &str) -> AppResult<String> {
     let multipart_upload = self
       .bucket
       .create_multipart_upload()
       .bucket(&self.bucket_name)
-      .content_type("video/mp4")
+      .content_type(content_type)
       .key(key)
       .send()
       .await?;

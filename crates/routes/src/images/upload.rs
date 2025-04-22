@@ -12,31 +12,35 @@ use utils::error::{AppError, AppErrorType, AppResult};
 use utils::stream::{ProgressTrackingStream, UploadProgress};
 
 use crate::common::{GetUploadProgress, GetUploadProgressResponse};
-use crate::images::utils::generate_image_hash;
+use crate::images::utils::generate_file_hash;
 
-#[post("/upload")]
+#[post("/upload/large")]
 pub async fn upload_image(
   context: Data<AppContext>,
   mut payload: Multipart,
 ) -> AppResult<HttpResponse> {
   while let Ok(Some(field)) = payload.try_next().await {
     let content_disposition = field.content_disposition();
-
+    let content_type = field
+      .content_type()
+      .ok_or(AppErrorType::InvalidFile)?
+      .to_string();
     let filename = content_disposition
       .get_filename()
       .ok_or(AppErrorType::InvalidFile)?;
+
     // TODO: find a way to get full file size in stream
     let total_bytes = 0;
-    let image_hash = generate_image_hash(filename).await;
+    let file_hash = generate_file_hash(filename).await;
 
-    let (tx, _rx) = broadcast::channel::<u64>(100);
+    let (tx, _rx) = broadcast::channel::<u64>(500);
     {
       let mut progress = context.progress.lock().await;
       progress.insert(
-        image_hash.to_owned(),
+        file_hash.to_owned(),
         UploadProgress {
           total_bytes,
-          image_hash: image_hash.to_owned(),
+          file_hash: file_hash.to_owned(),
           sender: tx.clone(),
         },
       );
@@ -45,7 +49,10 @@ pub async fn upload_image(
     let field_stream = field.map_err(|_| AppError::from(AppErrorType::UploadFaild));
     let mut progress_stream = ProgressTrackingStream::new(field_stream, tx);
 
-    let multipart_upload_id = context.storage.create_multipart_upload(&image_hash).await?;
+    let multipart_upload_id = context
+      .storage
+      .create_multipart_upload(&file_hash, &content_type)
+      .await?;
     let mut parts = Vec::new();
     let mut part_number = 1;
 
@@ -53,7 +60,7 @@ pub async fn upload_image(
       let s3_stream = ByteStream::from(bytes.to_vec());
       let upload_part = context
         .storage
-        .upload_part(&image_hash, &multipart_upload_id, part_number, s3_stream)
+        .upload_part(&file_hash, &multipart_upload_id, part_number, s3_stream)
         .await?;
 
       parts.push(
@@ -70,30 +77,77 @@ pub async fn upload_image(
       .build();
     context
       .storage
-      .complete_multipart_upload(&image_hash, completed_upload, &multipart_upload_id)
+      .complete_multipart_upload(&file_hash, completed_upload, &multipart_upload_id)
       .await?;
   }
 
   Ok(HttpResponse::NoContent().finish())
 }
 
-#[get("/{name}")]
+#[post("upload/small")]
+pub async fn upload_small(
+  context: Data<AppContext>,
+  mut payload: Multipart,
+) -> AppResult<HttpResponse> {
+  while let Ok(Some(field)) = payload.try_next().await {
+    let content_disposition = field.content_disposition();
+    let content_type = field
+      .content_type()
+      .ok_or(AppErrorType::InvalidFile)?
+      .to_string();
+    let filename = content_disposition
+      .get_filename()
+      .ok_or(AppErrorType::InvalidFile)?;
+
+    let total_bytes = 0;
+    let file_hash = generate_file_hash(filename).await;
+
+    let (tx, _rx) = broadcast::channel::<u64>(100);
+    {
+      let mut progress_map = context.progress.lock().await;
+      progress_map.insert(
+        file_hash.to_owned(),
+        UploadProgress {
+          file_hash: file_hash.to_owned(),
+          sender: tx.clone(),
+          total_bytes,
+        },
+      );
+    }
+
+    let field_stream = field.map_err(|_| AppError::from(AppErrorType::UploadFaild));
+    let mut progress_stream = ProgressTrackingStream::new(field_stream, tx);
+
+    let mut buffer = Vec::new();
+    while let Ok(Some(bytes)) = progress_stream.try_next().await {
+      buffer.extend_from_slice(&bytes);
+    }
+
+    let byte_stream = ByteStream::from(buffer);
+    context
+      .storage
+      .put_object(&file_hash, &content_type, byte_stream)
+      .await?;
+  }
+
+  Ok(HttpResponse::NoContent().finish())
+}
+
+#[get("/{hash}")]
 pub async fn get_upload_progress(
   context: Data<AppContext>,
   path: Path<GetUploadProgress>,
 ) -> AppResult<HttpResponse> {
-  let image_hash = generate_image_hash(&path.image_name).await;
+  let file_hash = generate_file_hash(&path.file_hash).await;
 
   let (total_bytes, mut rx, image_hash) = {
     let progress_map = context.progress.lock().await;
-    let progress = progress_map
-      .get(&image_hash)
-      .ok_or(AppErrorType::NotFound)?;
+    let progress = progress_map.get(&file_hash).ok_or(AppErrorType::NotFound)?;
 
     (
       progress.total_bytes,
       progress.sender.subscribe(),
-      progress.image_hash.clone(),
+      progress.file_hash.clone(),
     )
   };
 
@@ -105,7 +159,7 @@ pub async fn get_upload_progress(
       let response = serde_json::to_string(&GetUploadProgressResponse {
         bytes_uploaded: uploaded,
         total_bytes,
-        image_hash: image_hash.to_owned()
+        file_hash: image_hash.to_owned()
       })?;
       yield Ok::<_, actix_web::Error>(Bytes::from(format!("data: {}\n\n", response)))
     }

@@ -11,7 +11,7 @@ use crate::error::AppResult;
 #[derive(Debug)]
 pub struct UploadProgress {
   pub total_bytes: u64,
-  pub image_hash: String,
+  pub file_hash: String,
   pub sender: broadcast::Sender<u64>,
 }
 
@@ -38,7 +38,7 @@ where
 {
   type Item = AppResult<Bytes>;
   fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-    match std::pin::Pin::new(&mut self.inner).poll_next(cx) {
+    match Pin::new(&mut self.inner).poll_next(cx) {
       Poll::Ready(Some(Ok(bytes))) => {
         let _ = self.sender.send(bytes.len() as u64);
         Poll::Ready(Some(Ok(bytes)))
