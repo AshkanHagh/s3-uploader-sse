@@ -1,9 +1,9 @@
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::Mutex;
 
-use crate::{image::ImageUploader, stream::UploadProgress};
+use crate::{UploadProgress, utils::s3::S3ImageUploader};
 
 pub struct AppContext {
-  pub storage: ImageUploader,
+  pub s3: S3ImageUploader,
   pub progress: Arc<Mutex<HashMap<String, UploadProgress>>>,
 }

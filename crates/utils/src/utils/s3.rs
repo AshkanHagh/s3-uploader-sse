@@ -1,18 +1,18 @@
-use crate::error::{AppErrorType, AppResult};
+use crate::{
+  error::{AppErrorType, AppResult},
+  settings::{SETTINGS, structs::Settings},
+};
 use aws_sdk_s3::{
   Client, config::Credentials, operation::upload_part::UploadPartOutput, primitives::ByteStream,
   types::CompletedMultipartUpload,
 };
 
-use super::ImageConfig;
-
 pub struct S3ImageUploader {
   pub(super) bucket: Client,
-  bucket_name: String,
 }
 
 impl S3ImageUploader {
-  pub fn new(config: &ImageConfig, bucket_name: &str) -> AppResult<Self> {
+  pub fn new(config: &Settings) -> AppResult<Self> {
     let credentials = Credentials::new(&config.access_key, &config.secret_key, None, None, "s3");
     let config = aws_sdk_s3::Config::builder()
       .region(aws_sdk_s3::config::Region::new(""))
@@ -24,7 +24,6 @@ impl S3ImageUploader {
 
     Ok(Self {
       bucket: Client::from_conf(config),
-      bucket_name: bucket_name.to_owned(),
     })
   }
 
@@ -37,7 +36,7 @@ impl S3ImageUploader {
     self
       .bucket
       .put_object()
-      .bucket(&self.bucket_name)
+      .bucket(&SETTINGS.bucket)
       .key(key)
       .content_type(content_type)
       .body(bytes)
@@ -51,7 +50,7 @@ impl S3ImageUploader {
     let multipart_upload = self
       .bucket
       .create_multipart_upload()
-      .bucket(&self.bucket_name)
+      .bucket(&SETTINGS.bucket)
       .content_type(content_type)
       .key(key)
       .send()
@@ -75,7 +74,7 @@ impl S3ImageUploader {
     let upload_part = self
       .bucket
       .upload_part()
-      .bucket(&self.bucket_name)
+      .bucket(&SETTINGS.bucket)
       .key(key)
       .upload_id(upload_id)
       .part_number(part_number)
@@ -95,7 +94,7 @@ impl S3ImageUploader {
     self
       .bucket
       .complete_multipart_upload()
-      .bucket(&self.bucket_name)
+      .bucket(&SETTINGS.bucket)
       .key(key)
       .multipart_upload(completed_upload)
       .upload_id(upload_id)

@@ -60,11 +60,11 @@ impl From<AppErrorType> for AppError {
 }
 
 pub trait AppErrorExt<T, E: Into<anyhow::Error>> {
-  fn with_app_error(self, error_type: AppErrorType) -> AppResult<T>;
+  fn with_app_type(self, error_type: AppErrorType) -> AppResult<T>;
 }
 
 impl<T, E: Into<anyhow::Error>> AppErrorExt<T, E> for Result<T, E> {
-  fn with_app_error(self, error_type: AppErrorType) -> AppResult<T> {
+  fn with_app_type(self, error_type: AppErrorType) -> AppResult<T> {
     self.map_err(|err| AppError {
       error_type,
       inner: err.into(),
