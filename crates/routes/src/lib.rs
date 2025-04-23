@@ -1,2 +1,2 @@
 pub mod common;
-pub mod uploads;
+pub mod files;

@@ -46,7 +46,6 @@ pub async fn upload_image(
         file_hash.to_owned(),
         UploadProgress {
           total_bytes,
-          file_hash: file_hash.to_owned(),
           sender: tx.clone(),
         },
       );
@@ -154,15 +153,11 @@ pub async fn get_upload_progress(
 ) -> AppResult<HttpResponse> {
   let file_hash = generate_file_hash(&path.file_hash).await;
 
-  let (total_bytes, mut rx, image_hash) = {
+  let (total_bytes, mut rx) = {
     let progress_map = context.progress.lock().await;
     let progress = progress_map.get(&file_hash).ok_or(AppErrorType::NotFound)?;
 
-    (
-      progress.total_bytes,
-      progress.sender.subscribe(),
-      progress.file_hash.clone(),
-    )
+    (progress.total_bytes, progress.sender.subscribe())
   };
 
   let body = stream! {
@@ -170,7 +165,6 @@ pub async fn get_upload_progress(
       let response = serde_json::to_string(&GetUploadProgressResponse {
         bytes_uploaded: bytes,
         total_bytes,
-        file_hash: image_hash.to_owned()
       })?;
       yield Ok::<_, actix_web::Error>(Bytes::from(format!("data: {}\n\n", response)));
 

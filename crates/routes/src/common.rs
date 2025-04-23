@@ -15,5 +15,4 @@ pub struct GetUploadProgress {
 pub struct GetUploadProgressResponse {
   pub total_bytes: u64,
   pub bytes_uploaded: u64,
-  pub file_hash: String,
 }
